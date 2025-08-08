@@ -1,0 +1,60 @@
+import numpy as np
+import pandas as pd
+import yfinance as yf
+import matplotlib.pyplot as plt
+from scipy.stats import norm
+
+# Step 1: Load market data
+def get_data(ticker='AAPL', start='2022-01-01', end='2023-01-01'):
+    data = yf.download(ticker, start=start, end=end)
+    data['Returns'] = data['Adj Close'].pct_change()
+    return data.dropna()
+
+# Step 2: Historical VaR
+def historical_var(returns, confidence_level=0.95):
+    var = np.percentile(returns, (1 - confidence_level) * 100)
+    return var
+
+# Step 3: Variance-Covariance VaR
+def parametric_var(returns, confidence_level=0.95):
+    mu = np.mean(returns)
+    sigma = np.std(returns)
+    var = norm.ppf(1 - confidence_level, mu, sigma)
+    return var
+
+# Step 4: Monte Carlo Simulation VaR
+def monte_carlo_var(start_price, mu, sigma, num_simulations=10000, confidence_level=0.95):
+    simulated_returns = np.random.normal(mu, sigma, num_simulations)
+    simulated_prices = start_price * (1 + simulated_returns)
+    simulated_losses = start_price - simulated_prices
+    var = np.percentile(simulated_losses, confidence_level * 100)
+    return var
+
+# Step 5: Run and Display
+def run_var_analysis(ticker='AAPL'):
+    data = get_data(ticker)
+    returns = data['Returns']
+
+    hist_var = historical_var(returns)
+    param_var = parametric_var(returns)
+    start_price = data['Adj Close'][-1]
+    mu = returns.mean()
+    sigma = returns.std()
+    mc_var = monte_carlo_var(start_price, mu, sigma)
+
+    print(f"Value at Risk (VaR) for {ticker}")
+    print(f"----------------------------------")
+    print(f"Historical VaR (95%): {-hist_var:.4%}")
+    print(f"Parametric VaR (95%): {-param_var:.4%}")
+    print(f"Monte Carlo VaR (95%): ${mc_var:.2f}")
+
+    # Optional: plot return distribution
+    plt.hist(returns, bins=50, edgecolor='black')
+    plt.axvline(hist_var, color='r', linestyle='dashed', linewidth=2, label='Historical VaR')
+    plt.axvline(param_var, color='g', linestyle='dashed', linewidth=2, label='Parametric VaR')
+    plt.title(f'Return Distribution: {ticker}')
+    plt.legend()
+    plt.show()
+
+# Run the analysis
+run_var_analysis('AAPL')
